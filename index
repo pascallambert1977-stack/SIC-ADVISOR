@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SIC ADVISOR</title>
+
+  <style>
+    :root { --primary:#800080; --bg:#fdfafc; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+      margin: 0; padding: 20px; color: #333;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    .bg-layer {
+      position: fixed; inset: 0;
+      z-index: -1;
+      background-color: var(--bg);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      pointer-events: none;
+    }
+
+    .container { max-width: 760px; margin: auto; }
+    h1 { color: var(--primary); text-align: center; font-variant: small-caps; }
+
+    .toolbar { display:flex; justify-content:flex-end; gap:8px; }
+    .btn {
+      background: white; border: 1px solid var(--primary); color: var(--primary);
+      padding: 6px 10px; border-radius: 8px; cursor: pointer;
+    }
+    .btn.small { padding: 3px 8px; font-size:0.9em; }
+    .btn.primary { background:var(--primary); color:#fff; }
+
+    .card {
+      background:white; padding:20px; border-radius:15px; margin-bottom:20px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .result-item {
+      background:white; padding:15px; margin-bottom:15px;
+      border-radius:12px; border-left:8px solid var(--primary);
+      position:relative;
+    }
+    .badge {
+      background:#f3e5f5; color:var(--primary);
+      padding:3px 8px; border-radius:5px; font-size:0.7em;
+      margin-left:8px;
+    }
+    .btn-maps {
+      display:inline-block; margin-top:10px;
+      background:var(--primary); color:white; padding:10px;
+      border-radius:8px; text-decoration:none; font-weight:bold;
+    }
+
+    .actions {
+      position:absolute; top:15px; right:15px; display:flex; gap:10px;
+    }
+    .btn-edit, .btn-del {
+      background:none; border:none; cursor:pointer;
+      font-size:0.85em; text-decoration:underline;
+    }
+    .btn-edit { color:#4a90e2; }
+    .btn-del { color:#ff4d4d; }
+
+    /* Modal */
+    .modal {
+      position:fixed; inset:0;
+      background:rgba(0,0,0,0.45);
+      display:none; align-items:center; justify-content:center;
+      z-index:1000; padding:20px;
+    }
+    .modal.open { display:flex; }
+    .modal-card {
+      background:#fff; border-radius:16px;
+      width:100%; max-width:700px; padding:20px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+
+<body>
+<div id="bgLayer" class="bg-layer"></div>
+
+<div class="container">
+
+  <div class="toolbar">
+    <button class="btn primary small" onclick="openModalForCreate()" id="btnOpenAdd">➕ Ajouter</button>
+    <button class="btn small" id="btnLang" onclick="switchLang()">🇳🇱 NL</button>
+    <button class="btn small" id="btnSettings" onclick="toggleSettings()">⚙️</button>
+  </div>
+
+  <h1 id="appTitle">SIC ADVISOR</h1>
+
+  <!-- RECHERCHE -->
+  <div class="card">
+    <h3 id="searchTitle">🔍 Rechercher</h3>
+    <input type="text" id="searchInput" placeholder="Nom..." onkeyup="onSearchChange()">
+
+    <select id="searchZone" onchange="onSearchChange(); updateCommuneFilterVisibility(); updateCityFilterVisibility()">
+      <option value="tous" id="optAll">🌍 Toutes les zones</option>
+      <option value="bx">🇧🇪 Bruxelles</option>
+      <option value="hors">🚗 Hors Bruxelles</option>
+    </select>
+
+    <div id="filter-commune" class="row" style="display:none; margin-top:10px;">
+      <label id="labelSearchCommune" for="searchCommune">Commune</label>
+      <select id="searchCommune" onchange="onSearchChange()">
+        <option value="all" id="optAllComm">Toutes les communes</option>
+      </select>
+    </div>
+
+    <div id="filter-city" class="row" style="display:none; margin-top:10px;">
+      <label id="labelSearchCity" for="searchCity">Ville</label>
+      <select id="searchCity" onchange="onSearchChange()">
+        <option value="all" id="optAllCity">Toutes les villes</option>
+      </select>
+    </div>
+
+    <div id="resultsMeta"></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal" aria-modal="true">
+  <div class="modal-card">
+    <h2 id="formTitle">➕ Ajouter</h2>
+
+    <input type="hidden" id="editId">
+    <label>Nom :</label>
+    <input type="text" id="f-name">
+
+    <label id="labelType">Type d'établissement</label>
+    <select id="f-type"></select>
+
+    <label>Zone :</label>
+    <select id="f-isbx" onchange="toggleZone()">
+      <option value="oui">Bruxelles</option>
+      <option value="non">Hors Bruxelles</option>
+    </select>
+
+    <div id="box-bx">
+      <label>Commune :</label>
+      <select id="f-commune"></select>
+    </div>
+
+    <div id="box-hors" style="display:none">
+      <label>Ville :</label>
+      <input type="text" id="f-city">
+    </div>
+
+    <label>Adresse :</label>
+    <input type="text" id="f-addr">
+
+    <label id="labelComment">Commentaire</label>
+    <input type="text" id="f-comment">
+
+    <button class="btn" onclick="onCancel()">Annuler</button>
+    <button class="btn primary" id="btnSubmit" onclick="save()">Enregistrer</button>
+  </div>
+</div>
+
+<script>
+/* --- Début du script : structures, stockage, utils --- */
+
+const communes = ["Anderlecht","Auderghem","Berchem-Sainte-Agathe","Bruxelles-Ville","Etterbeek","Evere","Forest","Ganshoren","Ixelles","Jette","Koekelberg","Molenbeek-Saint-Jean","Saint-Gilles","Saint-Josse-ten-Noode","Schaerbeek","Uccle","Watermael-Boitsfort","Woluwe-Saint-Lambert","Woluwe-Saint-Pierre"];
+
+const TYPE_KEYS = ['cafe','hotel','restaurant','culture','autre'];
+const TYPE_EMOJI = { cafe:'☕', hotel:'🏨', restaurant:'🍽️', culture:'🎭', autre:'🏷️' };
+
+function normalizeLower(s) {
+  return (s || '').normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+}
+
+function emojiForType(t){ return TYPE_EMOJI[t] || '🏷️'; }
+
+/* --- FIX : fonction Google Maps corrigée --- */
+function buildMapsUrl(item) {
+  const lieu = item.isBx ? item.commune : item.city;
+  const country = (lang === 'nl') ? 'België' : 'Belgique';
+  const q = `${item.name} ${item.addr}, ${lieu}, ${country}`;
+  const params = new URLSearchParams({ api:'1', query:q, hl:lang, gl:'BE' });
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
+
+/* --- État --- */
+
+let lang = localStorage.getItem("lang_v18") || "fr";
+let database = JSON.parse(localStorage.getItem("data_v18") || "[]");
+
+let searchQ = "";
+let searchZone = "tous";
+let searchCommune = "all";
+let searchCity = "all";
+
+/* --- Début du rendu: refresh() corrigé --- */
+
+function updateResultsMeta(n=0) {
+  const l = (lang === 'fr')
+    ? (n===0?"Aucun résultat":n===1?"1 résultat":`${n} résultats`)
+    : (n===0?"Geen resultaat":n===1?"1 resultaat":`${n} resultaten`);
+  document.getElementById("resultsMeta").textContent = l;
+}
+
+function refresh() {
+  const list = document.getElementById("results");
+  list.innerHTML = "";
+
+  const q = normalizeLower(document.getElementById("searchInput").value);
+  const z = document.getElementById("searchZone").value;
+  const c = document.getElementById("searchCommune").value;
+  const v = document.getElementById("searchCity").value;
+
+  const f = database.filter(i => {
+    const mName = normalizeLower(i.name).includes(q);
+    const mZone = (z==="tous") || (z==="bx" && i.isBx) || (z==="hors" && !i.isBx);
+    const mCommune = (z!=="bx") || (c==="all") || (normalizeLower(i.commune)===normalizeLower(c));
+    const mCity = (z!=="hors") || (v==="all") || (normalizeLower(i.city)===normalizeLower(v));
+    return mName && mZone && mCommune && mCity;
+  });
+
+  updateResultsMeta(f.length);
+
+  f.forEach(i => {
+    const div = document.createElement("div");
+    div.className = "result-item";
+
+    const type = TYPE_KEYS.includes(i.type)?i.type:"autre";
+    const label = (lang==="fr"
+      ? {cafe:"Café",hotel:"Hôtel",restaurant:"Restaurant",culture:"Culture",autre:"Autre"}[type]
+      : {cafe:"Café",hotel:"Hotel",restaurant:"Restaurant",culture:"Cultuur",autre:"Anders"}[type]
+    );
+
+    div.innerHTML = `
+      <div class="actions">
+        <button class="btn-edit" onclick="loadEdit(${i.id})">📝 Modifier</button>
+        <button class="btn-del" onclick="del(${i.id})">X</button>
+      </div>
+
+      <h3>${i.name}
+        <span class="badge">${emojiForType(type)} ${label}</span>
+      </h3>
+
+      <p>📍 ${i.addr}, ${i.isBx?i.commune:i.city}</p>
+
+      ${i.comment ? `<p style="color:gray;font-style:italic">💬 ${i.comment}</p>` : ""}
+    `;
+
+    const a = document.createElement("a");
+    a.href = buildMapsUrl(i);
+    a.target = "_blank";
+    a.className = "btn-maps";
+    a.textContent = (lang==="fr" ? "🗺️ Ouvrir dans Maps" : "🗺️ Openen in Maps");
+
+    div.appendChild(a);
+    list.appendChild(div);
+  });
+}
+
+/* --- Fin Bloc 1 --- */
+</script>
+
+/* ------------------------------------------------------------------
+   BLOC 2 — CRUD / MODAL / THÈME / IMPORT / EXPORT / AUTO-BACKUP
+------------------------------------------------------------------- */
+
+/* -------------------- MODAL -------------------- */
+
+function openModal() {
+  document.getElementById("modal").classList.add("open");
+  setTimeout(() => document.getElementById("f-name").focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("open");
+}
+
+function openModalForCreate() {
+  resetForm();
+  openModal();
+}
+
+function onCancel() {
+  resetForm();
+  closeModal();
+}
+
+/* -------------------- CRUD -------------------- */
+
+function save() {
+  const id = document.getElementById("editId").value;
+  const name = document.getElementById("f-name").value.trim();
+  const addr = document.getElementById("f-addr").value.trim();
+  const type = document.getElementById("f-type").value || "autre";
+  const isBx = document.getElementById("f-isbx").value === "oui";
+  const commune = document.getElementById("f-commune").value;
+  const city = document.getElementById("f-city").value.trim();
+  const comment = document.getElementById("f-comment").value.trim();
+
+  if (!name || !addr) {
+    return alert(lang === "fr" ? "Nom et Adresse obligatoires" : "Naam en adres zijn verplicht");
+  }
+
+  const obj = {
+    id: id ? parseInt(id) : Date.now(),
+    name, addr, type,
+    isBx, commune, city,
+    comment
+  };
+
+  // Anti-doublons
+  const key = `${normalizeLower(name)}|${normalizeLower(addr)}|${normalizeLower(isBx?commune:city)}`;
+  const existingIdx = database.findIndex(x =>
+    `${normalizeLower(x.name)}|${normalizeLower(x.addr)}|${normalizeLower(x.isBx?x.commune:x.city)}` === key
+  );
+
+  if (id) {
+    // Mise à jour
+    const idx = database.findIndex(x => x.id === parseInt(id));
+    if (idx !== -1) database[idx] = obj;
+  } else if (existingIdx !== -1) {
+    // Remplacement si entrée identique
+    obj.id = database[existingIdx].id;
+    database[existingIdx] = obj;
+  } else {
+    // Nouveau
+    database.push(obj);
+  }
+
+  localStorage.setItem("data_v18", JSON.stringify(database));
+  rebuildCityFilterOptions(true);
+  resetForm();
+  closeModal();
+  refresh();
+  autoBackup("post-save");
+}
+
+function loadEdit(id) {
+  const i = database.find(x => x.id === id);
+  if (!i) return;
+
+  document.getElementById("editId").value = i.id;
+  document.getElementById("f-name").value = i.name;
+  document.getElementById("f-type").value = TYPE_KEYS.includes(i.type) ? i.type : "autre";
+  document.getElementById("f-isbx").value = i.isBx ? "oui" : "non";
+
+  toggleZone();
+
+  document.getElementById("f-commune").value = i.commune || "";
+  document.getElementById("f-city").value = i.city || "";
+  document.getElementById("f-addr").value = i.addr;
+  document.getElementById("f-comment").value = i.comment || "";
+
+  document.getElementById("formTitle").textContent =
+    lang === "fr" ? "📝 Modifier" : "📝 Bewerken";
+  document.getElementById("btnSubmit").textContent =
+    lang === "fr" ? "Mettre à jour" : "Bijwerken";
+
+  openModal();
+}
+
+function resetForm() {
+  document.getElementById("editId").value = "";
+  document.getElementById("f-name").value = "";
+  document.getElementById("f-type").value = "autre";
+  document.getElementById("f-addr").value = "";
+  document.getElementById("f-comment").value = "";
+  document.getElementById("f-city").value = "";
+
+  toggleZone();
+
+  document.getElementById("formTitle").textContent =
+    lang === "fr" ? "➕ Ajouter" : "➕ Toevoegen";
+  document.getElementById("btnSubmit").textContent =
+    lang === "fr" ? "Enregistrer" : "Opslaan";
+}
+
+function del(id) {
+  if (!confirm(lang === "fr" ? "Supprimer ?" : "Verwijderen?")) return;
+
+  database = database.filter(x => x.id !== id);
+  localStorage.setItem("data_v18", JSON.stringify(database));
+
+  rebuildCityFilterOptions(true);
+  refresh();
+  autoBackup("post-delete");
+}
+
+/* -------------------- ZONES -------------------- */
+
+function toggleZone() {
+  const isBx = document.getElementById("f-isbx").value === "oui";
+  document.getElementById("box-bx").style.display = isBx ? "block" : "none";
+  document.getElementById("box-hors").style.display = isBx ? "none" : "block";
+}
+
+/* -------------------- RECHERCHE + FILTRES -------------------- */
+
+function onSearchChange() {
+  searchQ = document.getElementById("searchInput").value;
+  searchZone = document.getElementById("searchZone").value;
+
+  if (searchZone === "bx") {
+    searchCommune = document.getElementById("searchCommune").value;
+  } else {
+    searchCommune = "all";
+  }
+
+  if (searchZone === "hors") {
+    searchCity = document.getElementById("searchCity").value;
+  } else {
+    searchCity = "all";
+  }
+
+  refresh();
+}
+
+function updateCommuneFilterVisibility() {
+  document.getElementById("filter-commune").style.display =
+    document.getElementById("searchZone").value === "bx" ? "block" : "none";
+}
+
+function updateCityFilterVisibility() {
+  document.getElementById("filter-city").style.display =
+    document.getElementById("searchZone").value === "hors" ? "block" : "none";
+}
+
+function rebuildCityFilterOptions(preserve = true) {
+  const sel = document.getElementById("searchCity");
+  const prev = preserve ? sel.value : "all";
+
+  const cities = [...new Set(
+    database.filter(i => !i.isBx && i.city).map(i => i.city.trim())
+  )].sort((a,b) => normalizeLower(a).localeCompare(normalizeLower(b)));
+
+  sel.innerHTML = "";
+  sel.add(new Option(lang === "fr" ? "Toutes les villes" : "Alle steden", "all"));
+  cities.forEach(c => sel.add(new Option(c, c)));
+
+  sel.value = cities.includes(prev) ? prev : "all";
+}
+
+/* -------------------- LANGUE -------------------- */
+
+function switchLang() {
+  lang = (lang === "fr") ? "nl" : "fr";
+  localStorage.setItem("lang_v18", lang);
+  applyLang();
+  refresh();
+}
+
+function applyLang() {
+  document.getElementById("btnLang").textContent = lang === "fr" ? "🇳🇱 NL" : "🇫🇷 FR";
+  document.getElementById("btnSubmit").textContent =
+    document.getElementById("editId").value ? (lang==="fr"?"Mettre à jour":"Bijwerken")
+                                            : (lang==="fr"?"Enregistrer":"Opslaan");
+
+  document.getElementById("formTitle").textContent =
+    document.getElementById("editId").value ? (lang==="fr"?"📝 Modifier":"📝 Bewerken")
+                                            : (lang==="fr"?"➕ Ajouter":"➕ Toevoegen");
+
+  updateResultsMeta();
+}
+
+/* -------------------- THÈME + ARRIÈRE‑PLAN -------------------- */
+
+let themePrimary = "#800080";
+let themeBg = "#fdfafc";
+let themeBgImg = "";
+let preserveBg = true;
+
+function applyTheme(primary, bg, bgImg) {
+  document.documentElement.style.setProperty("--primary", primary);
+  document.documentElement.style.setProperty("--bg", bg);
+
+  const layer = document.getElementById("bgLayer");
+  layer.style.backgroundColor = bg;
+  layer.style.backgroundImage = bgImg ? `url('${bgImg}')` : "none";
+
+  themePrimary = primary;
+  themeBg = bg;
+  themeBgImg = bgImg || "";
+}
+
+function removeBgImage() {
+  applyTheme(themePrimary, themeBg, "");
+}
+
+function resetTheme() {
+  applyTheme("#800080", "#fdfafc", "");
+}
+
+function applyThemeFromInputs() {
+  const primary = document.getElementById("primaryColor").value;
+  const bg = document.getElementById("bgColor").value;
+  applyTheme(primary, bg, themeBgImg);
+}
+
+/* -------------------- BACKUP AUTOMATIQUE -------------------- */
+
+function autoBackup(reason = "auto") {
+  const payload = {
+    ts: new Date().toISOString(),
+    items: database,
+    theme: {
+      primary: themePrimary,
+      bg: themeBg,
+      bgImg: themeBgImg
+    }
+  };
+
+  localStorage.setItem("backup_v18", JSON.stringify(payload));
+}
+
+function restoreFromBackup() {
+  const raw = localStorage.getItem("backup_v18");
+  if (!raw) {
+    alert(lang==="fr"?"Aucune sauvegarde":"Geen backup");
+    return;
+  }
+
+  const payload = JSON.parse(raw);
+  if (!payload.items) return;
+
+  database = payload.items;
+  applyTheme(payload.theme.primary, payload.theme.bg, payload.theme.bgImg);
+
+  refresh();
+  alert(lang==="fr"?"Restauration effectuée":"Herstel voltooid");
+}
+
+/* -------------------- IMPORT / EXPORT -------------------- */
+
+function exportData() {
+  const content = {
+    theme: { primary:themePrimary, bg:themeBg, bgImg:themeBgImg },
+    items: database
+  };
+  const blob = new Blob([JSON.stringify(content, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sicadvisor.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function doImport(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (parsed.theme) {
+        applyTheme(parsed.theme.primary, parsed.theme.bg, parsed.theme.bgImg);
+      }
+      if (Array.isArray(parsed.items)) {
+        database = parsed.items;
+      }
+      localStorage.setItem("data_v18", JSON.stringify(database));
+      refresh();
+    } catch (e) {
+      alert("Erreur : " + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ------------------------------------------------------------------
+   BLOC 3 — INITIALISATION, CHARGEMENT THÈME, ÉVÈNEMENTS, STARTUP
+------------------------------------------------------------------- */
+
+/* -------------------- TYPE OPTIONS -------------------- */
+
+function populateTypeOptions() {
+  const sel = document.getElementById("f-type");
+  sel.innerHTML = "";
+
+  const labels = (lang === "fr")
+    ? {cafe:"Café", hotel:"Hôtel", restaurant:"Restaurant", culture:"Culture", autre:"Autre"}
+    : {cafe:"Café", hotel:"Hotel", restaurant:"Restaurant", culture:"Cultuur", autre:"Anders"};
+
+  TYPE_KEYS.forEach(k => {
+    const opt = new Option(`${emojiForType(k)} ${labels[k]}`, k);
+    sel.add(opt);
+  });
+
+  if (!sel.value) sel.value = "autre";
+}
+
+/* -------------------- IMAGE DE FOND (compression) -------------------- */
+
+document.addEventListener("DOMContentLoaded", () => {
+  const bgInput = document.getElementById("bgImage");
+  if (bgInput) {
+    bgInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const dataUrl = await compressImage(file);
+        applyTheme(themePrimary, themeBg, dataUrl);
+      } catch (err) {
+        console.warn("Compression failed:", err);
+        const reader = new FileReader();
+        reader.onload = () => applyTheme(themePrimary, themeBg, reader.result);
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+});
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      img.onload = () => {
+        const maxW = 1920, maxH = 1080;
+        let { width, height } = img;
+
+        const ratio = Math.min(maxW/width, maxH/height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = width * ratio;
+        canvas.height = height * ratio;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* -------------------- INIT -------------------- */
+
+function init() {
+
+  /* --- Chargement communes --- */
+  const listCommuneForm = document.getElementById("f-commune");
+  const listCommuneFilter = document.getElementById("searchCommune");
+
+  communes.forEach(c => {
+    listCommuneForm.add(new Option(c, c));
+    listCommuneFilter.add(new Option(c, c));
+  });
+
+  /* --- Types --- */
+  populateTypeOptions();
+
+  /* --- Filtres init --- */
+  document.getElementById("searchInput").value = searchQ;
+  document.getElementById("searchZone").value = searchZone;
+  document.getElementById("searchCommune").value = searchCommune;
+  document.getElementById("searchCity").value = searchCity;
+
+  /* --- Thème --- */
+  applyTheme(themePrimary, themeBg, themeBgImg);
+
+  /* --- Langue --- */
+  applyLang();
+
+  /* --- Filtres visibles --- */
+  updateCommuneFilterVisibility();
+  rebuildCityFilterOptions(true);
+  updateCityFilterVisibility();
+
+  /* --- Rendu initial --- */
+  refresh();
+
+  /* --- Fermeture modal par Échap --- */
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+
+  /* --- Fermer en cliquant l’overlay --- */
+  document.getElementById("modal").addEventListener("click", (e) => {
+    if (e.target.id === "modal") closeModal();
+  });
+
+  /* --- Auto-backup sur fermeture --- */
+  window.addEventListener("beforeunload", () => autoBackup("beforeunload"));
+  window.addEventListener("pagehide", () => autoBackup("pagehide"));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") autoBackup("visibilitychange");
+  });
+}
+
+/* -------------------- STARTUP -------------------- */
+init();
+
+/* ------------------------------------------------------------------
+   FIN DU BLOC 3 — FIN DU SCRIPT — FIN DU FICHIER HTML
+------------------------------------------------------------------- */
+</script>
+</body>
+</html>

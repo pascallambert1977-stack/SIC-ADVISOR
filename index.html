@@ -1,17 +1,27 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sic Advisor</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
-    <script>
-        function refresh() {
-            // Updated Google Maps link
-            console.log('Google Maps refreshed!');
-        }
-    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIC ADVISOR</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Welcome to Sic Advisor</h1>
+    <header>
+        <h1>Welcome to SIC ADVISOR</h1>
+    </header>
+    <div id="map"></div>
     <button onclick="refresh()">Refresh Map</button>
+    <script>
+        function refresh() {
+            const url = 'https://www.google.com/maps'; // Fixed Google Maps link
+            const mapsLink = document.createElement('a');
+            mapsLink.href = url;
+            mapsLink.target = '_blank';
+            mapsLink.className = 'btn-maps';
+            mapsLink.innerText = 'Open Google Maps';
+            document.body.appendChild(mapsLink);
+        }
+    </script>
 </body>
 </html>
